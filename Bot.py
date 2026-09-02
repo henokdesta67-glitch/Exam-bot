@@ -20,7 +20,7 @@ def run_health_check_server():
 threading.Thread(target=run_health_check_server, daemon=True).start()
 
 # --- YOUR TELEGRAM BOT CODE ---
-BOT_TOKEN = "YOUR_BOT_TOKEN_HERE" 
+BOT_TOKEN = "8920477645:AAEzi5AEGhmbO2GIcW83x9CCTEfSvL9sbLo" 
 CHANNEL_ID = "@Evalex_academy"
 WEB_APP_URL = "https://exam-frontend-m8id.vercel.app/"
 
