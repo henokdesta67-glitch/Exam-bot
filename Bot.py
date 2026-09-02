@@ -1,15 +1,32 @@
+import os
 import time
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 import requests
 
-# --- CONFIGURATION ---
-BOT_TOKEN = "8920477645:AAEzi5AEGhmbO2GIcW83x9CCTEfSvL9sbLo" 
+# --- DUMMY HTTP SERVER FOR RENDER ---
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is active")
+
+def run_health_check_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
+    server.serve_forever()
+
+# Start background thread for Render health check
+threading.Thread(target=run_health_check_server, daemon=True).start()
+
+# --- YOUR TELEGRAM BOT CODE ---
+BOT_TOKEN = "YOUR_BOT_TOKEN_HERE" 
 CHANNEL_ID = "@Evalex_academy"
 WEB_APP_URL = "https://exam-frontend-m8id.vercel.app/"
 
 API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 def is_channel_member(user_id: int) -> bool:
-    """Checks if the user is an active member, admin, or owner of the channel."""
     url = f"{API_URL}/getChatMember"
     try:
         res = requests.get(url, params={"chat_id": CHANNEL_ID, "user_id": user_id}, timeout=5).json()
@@ -39,19 +56,20 @@ def answer_callback(callback_query_id: str):
     requests.post(url, json={"callback_query_id": callback_query_id})
 
 def get_gatekeeper_payload(user_id: int, first_name: str):
-    """Returns updated text matching the exam interface (2 Hours 30 Minutes, 45 Quantitative, 55 Verbal & Analytical)."""
     if is_channel_member(user_id):
         text = (
             f"👋 **Hello, {first_name}!**\n\n"
             "🎓 **Evalex Academy**\n"
             "**Final UAT Model Examination Portal**\n\n"
             "Welcome to the Final UAT Model examination simulation.\n\n"
-            "📝 **100 questions** (45 Quantitative, 55 Verbal & Analytical) · ⏱ **2 Hours 30 Minutes** · 🎯 **Pass Mark: 50%**\n\n"
+            "📝 **Total Questions:** 100 (45 Quantitative, 55 Verbal & Analytical)\n"
+            "⏱ **Duration:** 2 Hours 30 Minutes\n"
+            "🎯 **Pass Mark:** 50%\n\n"
             "Tap the button below to begin!"
         )
         keyboard = {
             "inline_keyboard": [
-                [{"text": "🚀 Start Examination", "web_app": {"url": WEB_APP_URL}}]
+                [{"text": " Start Exam", "web_app": {"url": WEB_APP_URL}}]
             ]
         }
         return text, keyboard
@@ -71,9 +89,7 @@ def get_gatekeeper_payload(user_id: int, first_name: str):
         return text, keyboard
 
 def main():
-    print("Bot active. Gatekeeper live with updated exam duration and sections...")
     offset = 0
-    
     while True:
         try:
             url = f"{API_URL}/getUpdates"
@@ -83,21 +99,19 @@ def main():
                 for update in res["result"]:
                     offset = update["update_id"] + 1
                     
-                    # Command: /start
                     if "message" in update and "text" in update.get("message", {}):
                         msg = update["message"]
                         if msg["text"].startswith("/start"):
                             user_id = msg["from"]["id"]
-                            first_name = msg["from"].get("first_name", "Candidate")
+                            first_name = msg["from"].get("first_name") or msg["from"].get("username") or "Candidate"
                             
                             text, keyboard = get_gatekeeper_payload(user_id, first_name)
                             send_message(msg["chat"]["id"], text, keyboard)
                     
-                    # Button: Verify Membership
                     elif "callback_query" in update:
                         cb = update["callback_query"]
                         user_id = cb["from"]["id"]
-                        first_name = cb["from"].get("first_name", "Candidate")
+                        first_name = cb["from"].get("first_name") or cb["from"].get("username") or "Candidate"
                         
                         answer_callback(cb["id"])
                         
